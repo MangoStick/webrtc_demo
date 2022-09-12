@@ -38,7 +38,8 @@ class _MyAppState extends State<MyApp> {
 
 
   Future connectSocket() async{
-    socket = IO.io('http://localhost:3000', IO.OptionBuilder().setTransports(['websocket']).build());
+    // socket = IO.io('http://localhost:3000', IO.OptionBuilder().setTransports(['websocket']).build());
+    socket = IO.io('https://ic-rtc-server.herokuapp.com', IO.OptionBuilder().setTransports(['websocket']).build());
     socket.onConnect((data) => print('연결 완료 !'));
 
     socket.on('joined', (data){
@@ -106,7 +107,7 @@ class _MyAppState extends State<MyApp> {
       _remoteRenderer.srcObject = stream;
     };
 
-    socket.emit('join', jsonEncode({"msg":"test"}));
+    socket.emit('join', jsonEncode({"room":"test"}));
   }
 
   Future _sendOffer() async{
@@ -114,7 +115,7 @@ class _MyAppState extends State<MyApp> {
     var offer = await pc!.createOffer();
     pc!.setLocalDescription(offer);
     var offerData = offer.toMap();
-    offerData['msg'] = 'test';
+    offerData['room'] = 'test';
     // socket.emit('offer', jsonEncode(offer.toMap()));
     socket.emit('offer', jsonEncode(offerData));
   }
@@ -129,7 +130,7 @@ class _MyAppState extends State<MyApp> {
     pc!.setLocalDescription(answer);
 
     var answerData = answer.toMap();
-    answerData['msg'] = 'test';
+    answerData['room'] = 'test';
 
     socket.emit('answer', jsonEncode(answerData));
   }
@@ -141,7 +142,7 @@ class _MyAppState extends State<MyApp> {
 
   Future _sendIce(RTCIceCandidate ice) async{
     var iceData = ice.toMap();
-    iceData['msg'] = 'test';
+    iceData['room'] = 'test';
     socket.emit('ice', jsonEncode(iceData));
   }
   Future _gotIce(RTCIceCandidate ice) async{
@@ -153,13 +154,6 @@ class _MyAppState extends State<MyApp> {
   @override
   Widget build(BuildContext context) {
     // TODO: implement build
-    return MaterialApp(
-      home: Row(
-        children: [
-          Expanded(child: RTCVideoView(_localRenderer)),
-          Expanded(child: RTCVideoView(_remoteRenderer)),
-        ],
-      ),
-    );
+    return MaterialApp( home: Scaffold( body: SafeArea( child: Container( child: Row( children: [ Expanded(child: RTCVideoView(_localRenderer)), Expanded(child: RTCVideoView(_remoteRenderer)), ], ), ), ), ), );
   }
 }
