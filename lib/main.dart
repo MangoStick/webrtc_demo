@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:after_layout/after_layout.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_webrtc/flutter_webrtc.dart';
 import 'package:socket_io_client/socket_io_client.dart' as IO;
@@ -8,12 +9,14 @@ void main() {
   runApp(MyApp());
 }
 
+final roomName = "prem";
+
 class MyApp extends StatefulWidget{
   @override
   State<MyApp> createState() => _MyAppState();
 }
 
-class _MyAppState extends State<MyApp> {
+class _MyAppState extends State<MyApp>{
   late final IO.Socket socket;
   final _localRenderer = RTCVideoRenderer();
   final _remoteRenderer = RTCVideoRenderer();
@@ -28,11 +31,12 @@ class _MyAppState extends State<MyApp> {
   }
 
   Future init() async{
+
     await _localRenderer.initialize();
     await _remoteRenderer.initialize();
-
     await connectSocket();
     await joinRoom();
+    WidgetsBinding.instance.addPostFrameCallback((_) => setState(() {}));
   }
 
 
@@ -63,6 +67,11 @@ class _MyAppState extends State<MyApp> {
     socket.on('ice', (data){
       data = jsonDecode(data);
       _gotIce(RTCIceCandidate(data['candidate'], data['sdpMid'], data['sdpMLineIndex']));
+    });
+
+    socket.on('disconnected', (data){
+      _remoteRenderer.srcObject = null;
+      WidgetsBinding.instance.addPostFrameCallback((_) => setState(() {}));
     });
   }
 
@@ -105,9 +114,10 @@ class _MyAppState extends State<MyApp> {
 
     pc!.onAddStream = (stream){
       _remoteRenderer.srcObject = stream;
+      WidgetsBinding.instance.addPostFrameCallback((_) => setState(() {}));
     };
 
-    socket.emit('join', jsonEncode({"room":"test"}));
+    socket.emit('join', jsonEncode({"room":roomName}));
   }
 
   Future _sendOffer() async{
@@ -115,7 +125,7 @@ class _MyAppState extends State<MyApp> {
     var offer = await pc!.createOffer();
     pc!.setLocalDescription(offer);
     var offerData = offer.toMap();
-    offerData['room'] = 'test';
+    offerData['room'] = roomName;
     // socket.emit('offer', jsonEncode(offer.toMap()));
     socket.emit('offer', jsonEncode(offerData));
   }
@@ -130,7 +140,7 @@ class _MyAppState extends State<MyApp> {
     pc!.setLocalDescription(answer);
 
     var answerData = answer.toMap();
-    answerData['room'] = 'test';
+    answerData['room'] = roomName;
 
     socket.emit('answer', jsonEncode(answerData));
   }
@@ -142,7 +152,7 @@ class _MyAppState extends State<MyApp> {
 
   Future _sendIce(RTCIceCandidate ice) async{
     var iceData = ice.toMap();
-    iceData['room'] = 'test';
+    iceData['room'] = roomName;
     socket.emit('ice', jsonEncode(iceData));
   }
   Future _gotIce(RTCIceCandidate ice) async{
@@ -150,10 +160,22 @@ class _MyAppState extends State<MyApp> {
   }
 
 
-
   @override
   Widget build(BuildContext context) {
     // TODO: implement build
-    return MaterialApp( home: Scaffold( body: SafeArea( child: Container( child: Row( children: [ Expanded(child: RTCVideoView(_localRenderer)), Expanded(child: RTCVideoView(_remoteRenderer)), ], ), ), ), ), );
+    return MaterialApp(
+      home: Scaffold(
+        // body: SafeArea(
+          // child: Container(
+            body:Column(
+              children: [
+                Flexible(child: RTCVideoView(_localRenderer, objectFit: RTCVideoViewObjectFit.RTCVideoViewObjectFitCover, filterQuality: FilterQuality.medium, mirror: true,)), 
+                Flexible(child: RTCVideoView(_remoteRenderer, objectFit: RTCVideoViewObjectFit.RTCVideoViewObjectFitCover, filterQuality: FilterQuality.medium,)), 
+              ], 
+            ), 
+          // ), 
+        ), 
+      // ), 
+    );
   }
 }
