@@ -2,12 +2,26 @@ import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_webrtc/flutter_webrtc.dart';
+import 'package:provider/provider.dart';
 import 'package:socket_io_client/socket_io_client.dart' as IO;
+import 'package:webrtc_demo/app_provider.dart';
 
 final roomName = "prem";
+final userId = "123";
+
+// void main() {
+//   runApp(MyApp());
+// }
 
 void main() {
-  runApp(MyApp());
+  runApp(
+    MultiProvider(
+      providers: [
+        ChangeNotifierProvider(create: (_) => AppProvider()),
+      ],
+      child: MyApp(),
+    ),
+  );
 }
 
 
@@ -25,7 +39,6 @@ class _MyAppState extends State<MyApp>{
 
   @override
   void initState() {
-    // TODO: implement initState
     init();
     super.initState();
   }
@@ -36,9 +49,13 @@ class _MyAppState extends State<MyApp>{
     await _remoteRenderer.initialize();
     await connectSocket();
     await joinRoom();
-    WidgetsBinding.instance.addPostFrameCallback((_) => setState(() {}));
+    setting();
+    // WidgetsBinding.instance.addPostFrameCallback((_) => setState(() {}));
   }
 
+  setting() {
+    context.read<AppProvider>().setInit(_localRenderer, _remoteRenderer);
+  }
 
 
   Future connectSocket() async{
@@ -70,8 +87,11 @@ class _MyAppState extends State<MyApp>{
     });
 
     socket.on('disconnected', (data){
-      _remoteRenderer.srcObject = null;
-      WidgetsBinding.instance.addPostFrameCallback((_) => setState(() {}));
+      if (data == userId) {
+        context.read<AppProvider>().removeRemote();
+        // _remoteRenderer.srcObject = null;
+        // WidgetsBinding.instance.addPostFrameCallback((_) => setState(() {}));
+      }
     });
   }
 
@@ -113,11 +133,12 @@ class _MyAppState extends State<MyApp>{
     };
 
     pc!.onAddStream = (stream){
-      _remoteRenderer.srcObject = stream;
-      WidgetsBinding.instance.addPostFrameCallback((_) => setState(() {}));
+      context.read<AppProvider>().listeningRemote(stream);
+      // _remoteRenderer.srcObject = stream;
+      // WidgetsBinding.instance.addPostFrameCallback((_) => setState(() {}));
     };
 
-    socket.emit('join', jsonEncode({"room":roomName}));
+    socket.emit('join', jsonEncode({"room":roomName, "userId": userId}));
   }
 
   Future _sendOffer() async{
@@ -162,20 +183,48 @@ class _MyAppState extends State<MyApp>{
 
   @override
   Widget build(BuildContext context) {
-    // TODO: implement build
     return MaterialApp(
       home: Scaffold(
-        // body: SafeArea(
-          // child: Container(
-            body:Column(
+        body: SafeArea(
+          child: Container(
+            child: Column(
               children: [
-                Flexible(child: RTCVideoView(_localRenderer, objectFit: RTCVideoViewObjectFit.RTCVideoViewObjectFitCover, filterQuality: FilterQuality.medium, mirror: true,)), 
-                Flexible(child: RTCVideoView(_remoteRenderer, objectFit: RTCVideoViewObjectFit.RTCVideoViewObjectFitCover, filterQuality: FilterQuality.medium,)), 
+                // Flexible(
+                //   child: RTCVideoView(
+                //     _localRenderer,
+                //     objectFit: RTCVideoViewObjectFit.RTCVideoViewObjectFitCover,
+                //     filterQuality: FilterQuality.medium, 
+                //     mirror: true,
+                //   ),
+                // ),
+                // Flexible(
+                //   child: RTCVideoView(
+                //     _remoteRenderer,
+                //     objectFit: RTCVideoViewObjectFit.RTCVideoViewObjectFitCover,
+                //     filterQuality: FilterQuality.medium,
+                //   ),
+                // ),
+                Flexible(
+                  child: RTCVideoView(
+                    context.watch<AppProvider>().localRenderer,
+                    objectFit: RTCVideoViewObjectFit.RTCVideoViewObjectFitCover,
+                    filterQuality: FilterQuality.medium, 
+                    mirror: true,
+                  ),
+                ),
+                context.watch<AppProvider>().remoteRenderer.srcObject != null ? 
+                Flexible(
+                  child: RTCVideoView(
+                    context.watch<AppProvider>().remoteRenderer,
+                    objectFit: RTCVideoViewObjectFit.RTCVideoViewObjectFitCover,
+                    filterQuality: FilterQuality.medium,
+                  ),
+                ) : Container()
               ], 
             ), 
-          // ), 
+          ), 
         ), 
-      // ), 
+      ), 
     );
   }
 }
